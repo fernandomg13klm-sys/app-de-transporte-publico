@@ -7,7 +7,7 @@ const CONFIG = {
   busFare: 11.0,        // tarifa de camión (MXN)
   taxiBase: 13.1,       // banderazo
   taxiPerKm: 7.5,
-  serviceFee: 0.08,     // comisión de la app (8%)
+  serviceFee: 0.15,     // comisión de la app en cada compra (15%)
 };
 
 const ROUTES = [

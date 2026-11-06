@@ -104,11 +104,12 @@ const taxis = TAXI_NAMES.map((name, i) => ({
   heading: Math.random() * Math.PI * 2, busy: false,
 }));
 const taxiEtaSec = (km) => (km * 1.3) / kmhToKms(CONFIG.taxiSpeedKmh); // 1.3 = factor por calles
-const taxiFare = (km) => {
-  const base = CONFIG.taxiBase + km * 1.3 * CONFIG.taxiPerKm;
-  const fee = base * CONFIG.serviceFee;
+// Toda compra (pasaje o taxi) lleva la comisión de la app encima del precio
+const withFee = (base) => {
+  const fee = Math.round(base * CONFIG.serviceFee * 100) / 100;
   return { base, fee, total: base + fee };
 };
+const taxiFare = (km) => withFee(CONFIG.taxiBase + km * 1.3 * CONFIG.taxiPerKm);
 
 // Destinos posibles = todas las paradas conocidas
 const DESTS = [...new Map(ROUTES.flatMap((r) => r.stops).map((s) => [s[0], s])).values()];
@@ -268,10 +269,11 @@ $("#destSelect").addEventListener("change", render.taxi);
 $("#walletChip").addEventListener("click", () => switchView("wallet"));
 
 $("#payBusBtn").addEventListener("click", () => {
-  const fare = CONFIG.busFare;
-  modal(`<h3>Pagar pasaje</h3><p>${route.name}<br>Tarifa: <b>${money(fare)}</b></p>`, [
+  const fare = withFee(CONFIG.busFare);
+  modal(`<h3>Pagar pasaje</h3><p>${route.name}<br>Pasaje: ${money(fare.base)}<br>
+    Comisión app (${Math.round(CONFIG.serviceFee * 100)}%): ${money(fare.fee)}<br>Total: <b>${money(fare.total)}</b></p>`, [
     ["Pagar", "primary", () => {
-      if (!wallet.charge(fare, `Pasaje ${route.id}`)) return needBalance(fare);
+      if (!wallet.charge(fare.total, `Pasaje ${route.id}`)) return needBalance(fare.total);
       modal(`<h3>✅ Pasaje pagado</h3><p>Muestra este código al chofer o escanéalo en el validador:</p>
         <div class="code">${ticketCode()}</div><p class="muted">Válido 60 min en ${route.id}.</p>`, [["Listo", "primary"]]);
     }],
