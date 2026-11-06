@@ -1,0 +1,10 @@
+{
+  "name": "MueveT · Transporte público",
+  "short_name": "MueveT",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f6fa",
+  "theme_color": "#1b2a41",
+  "lang": "es-MX",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
