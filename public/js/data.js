@@ -1,13 +1,20 @@
-// Datos de ejemplo (Guadalajara). En producción vendrían del backend / GPS de las unidades.
+"use strict";
+// Configuración y rutas. Los montos están en centavos (MXN) para evitar errores de redondeo.
 const CONFIG = {
   center: [20.6767, -103.3475],
   busSpeedKmh: 18,      // velocidad promedio de camión en ciudad
   taxiSpeedKmh: 24,     // velocidad promedio de taxi
   dwellSeconds: 30,     // tiempo detenido en cada parada
-  busFare: 11.0,        // tarifa de camión (MXN)
-  taxiBase: 13.1,       // banderazo
-  taxiPerKm: 7.5,
-  serviceFee: 0.15,     // comisión de la app en cada compra (15%)
+  roadFactor: 1.3,      // las calles no van en línea recta
+  busFare: 1100,        // pasaje de camión: $11.00
+  taxiBase: 1310,       // banderazo: $13.10
+  taxiPerKm: 750,       // $7.50 por km
+  commission: 0.15,     // comisión de la app en cada compra (15%)
+  ticketMinutes: 60,    // vigencia del boleto
+  welcomeBonus: 5000,   // saldo de regalo al crear cuenta de pasajero ($50)
+  liveTimeoutMs: 30000, // un chofer que no manda ubicación en 30 s deja de aparecer
+  requestTimeoutMs: 90000, // una solicitud de taxi sin respuesta se cancela en 90 s
+  demoDrivers: true,    // choferes de ejemplo para que el mapa no esté vacío
 };
 
 const ROUTES = [
@@ -35,6 +42,10 @@ const ROUTES = [
       ["Tlaquepaque Centro", 20.6405, -103.3115],
     ],
   },
-];
+].map(Geo.buildRoute);
 
-const TAXI_NAMES = ["Juan P.", "María L.", "Roberto G.", "Ana S.", "Luis M.", "Carmen R.", "Pedro V.", "Sofía H."];
+const routeById = (id) => ROUTES.find((r) => r.id === id);
+
+// Destinos para taxi = todas las paradas conocidas, sin repetir
+const DESTS = [...new Map(ROUTES.flatMap((r) => r.stops.slice(0, r.terminal + 1)).map((s) => [s[0], s])).values()]
+  .map(([name, lat, lng]) => ({ name, lat, lng }));

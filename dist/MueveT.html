@@ -1,0 +1,1459 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b2a41">
+  <title>MueveT · Transporte público</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+:root {
+  --bg: #f4f6fa; --fg: #1b2a41; --muted: #6b7a90; --card: #fff; --line: #e1e6ee;
+  --primary: #1b2a41; --accent: #ffb400; --ok: #2f9e5f; --bad: #d64528;
+  --radius: 14px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+button, input, select { font: inherit; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: .82rem; }
+.center { text-align: center; }
+.strong { font-weight: 700; }
+.error { color: var(--bad); font-size: .9rem; min-height: 1em; margin: 6px 0; }
+.error:empty { display: none; }
+
+/* ---------- Inicio de sesión ---------- */
+.auth { min-height: 100%; display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; background: linear-gradient(160deg, #1b2a41 0 38%, var(--bg) 38%); }
+.auth-box { width: 100%; max-width: 420px; background: var(--card); border-radius: 20px; padding: 24px 20px; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+.auth-logo { font-size: 2.2rem; text-align: center; }
+.auth h1 { text-align: center; margin: 4px 0 2px; }
+.seg { display: flex; background: var(--bg); border-radius: 12px; padding: 4px; margin: 18px 0 8px; }
+.seg-btn { flex: 1; border: 0; background: none; padding: 10px; border-radius: 9px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.seg-btn.active { background: #fff; color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.check { display: flex; gap: 8px; align-items: center; font-size: .9rem; margin: 10px 0; }
+.roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.role input { position: absolute; opacity: 0; pointer-events: none; }
+.role span { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px; border: 2px solid var(--line); border-radius: 12px; font-size: 1.5rem; cursor: pointer; text-align: center; }
+.role b { font-size: .78rem; }
+.role input:checked + span { border-color: var(--primary); background: #eef2f8; }
+.role input:focus-visible + span { outline: 2px solid var(--accent); }
+
+/* ---------- Estructura ---------- */
+.app { display: flex; flex-direction: column; height: 100%; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); background: var(--primary); color: #fff; }
+.brand { font-weight: 700; font-size: 1.15rem; }
+.wallet-chip { border: 0; background: var(--accent); color: var(--primary); font-weight: 800; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+
+.map-wrap { position: relative; height: 42vh; min-height: 240px; flex-shrink: 0; }
+#map { position: absolute; inset: 0; }
+#map.picking { cursor: crosshair; }
+.map-tools { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 500; }
+.map-btn { width: 42px; height: 42px; border-radius: 12px; border: 0; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.25); font-size: 1.2rem; cursor: pointer; }
+.map-btn.active { background: var(--accent); }
+.map-banner { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); background: var(--primary); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: .85rem; z-index: 500; white-space: nowrap; }
+
+.panel { flex: 1; overflow-y: auto; padding: 12px 16px 96px; }
+h3 { margin: 18px 0 8px; font-size: 1rem; }
+
+/* ---------- Formularios ---------- */
+.field { display: block; font-size: .85rem; color: var(--muted); margin: 10px 0; }
+.field input, .field select, .inline-form input { display: block; width: 100%; margin-top: 4px; padding: 11px 12px; font-size: 1rem; border: 1px solid #d5dbe5; border-radius: 10px; background: #fff; color: var(--fg); }
+.field input:focus, .field select:focus, .inline-form input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.inline-form { display: flex; gap: 8px; }
+.inline-form input { margin: 0; text-transform: uppercase; letter-spacing: 3px; font-family: ui-monospace, monospace; }
+
+/* ---------- Tarjetas ---------- */
+.card { background: var(--card); border-radius: var(--radius); padding: 14px; margin: 10px 0; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.card.highlight { border-left: 5px solid var(--accent); }
+.card.ok { border-left: 5px solid var(--ok); }
+.card.bad { border-left: 5px solid var(--bad); }
+.card.tip { background: #fff8e5; }
+.card p { margin: 8px 0; }
+.big { font-size: 1.8rem; font-weight: 800; }
+.route-info { font-size: .9rem; color: var(--muted); margin: 6px 0; }
+.route-info b { color: var(--fg); }
+.pill { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: middle; margin-right: 5px; }
+.tag { display: inline-block; font-size: .68rem; font-weight: 700; text-transform: uppercase; background: #e8ecf3; color: var(--muted); padding: 1px 6px; border-radius: 6px; vertical-align: middle; }
+.info { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 14px 0 0; font-size: .92rem; }
+.info dt { color: var(--muted); }
+.info dd { margin: 0; word-break: break-word; }
+.breakdown { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.breakdown td { padding: 5px 0; }
+.breakdown td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.breakdown .total td { border-top: 1px solid var(--line); font-weight: 800; padding-top: 8px; }
+
+/* ---------- Listas ---------- */
+.list { list-style: none; padding: 0; margin: 0; }
+.list li { display: flex; gap: 10px; align-items: center; background: var(--card); border-radius: var(--radius); padding: 11px 12px; margin: 8px 0; box-shadow: 0 1px 4px rgba(0,0,0,.06); cursor: pointer; }
+.list .ico { font-size: 1.4rem; }
+.list .grow { flex: 1; min-width: 0; }
+.list .right { text-align: right; white-space: nowrap; }
+
+.stops { list-style: none; padding: 0; margin: 0; }
+.stops li { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: start; padding: 8px 0; border-bottom: 1px dashed var(--line); cursor: pointer; }
+.stops li.mine { font-weight: 700; background: #fff8e5; }
+.stops li.terminal .txt::after { content: " · terminal"; color: var(--muted); font-size: .78rem; font-weight: 400; }
+.stops .dot { width: 14px; height: 14px; border-radius: 50%; border: 3px solid currentColor; background: #fff; margin-top: 3px; }
+.stops .txt, .stops .eta { color: var(--fg); }
+.stops .seg { display: block; color: var(--muted); font-size: .8rem; font-weight: 400; }
+.stops .eta { font-variant-numeric: tabular-nums; text-align: right; }
+
+.history { list-style: none; padding: 0; margin: 0; }
+.history li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.history .neg { color: var(--bad); } .history .pos { color: var(--ok); }
+
+/* ---------- Botones ---------- */
+.btn { display: inline-flex; justify-content: center; align-items: center; border: 0; border-radius: 12px; padding: 12px 16px; font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none; }
+.btn:disabled { opacity: .6; cursor: wait; }
+.btn.primary { background: var(--primary); color: #fff; width: 100%; margin-top: 12px; }
+.btn.small { padding: 8px 14px; font-size: .9rem; background: var(--accent); color: var(--primary); }
+.btn.ghost { background: #e8ecf3; color: var(--fg); }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.row-btns .btn { flex: 1; margin: 0; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.chip { border: 1px solid #d5dbe5; background: #fff; border-radius: 999px; padding: 7px 14px; font-weight: 700; cursor: pointer; color: var(--muted); }
+.chip.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.duty { display: block; width: 100%; border: 0; border-radius: var(--radius); padding: 16px; font-size: 1.25rem; font-weight: 800; cursor: pointer; text-align: left; }
+.duty small { display: block; font-size: .82rem; font-weight: 400; margin-top: 4px; }
+.duty.on { background: var(--ok); color: #fff; }
+.duty.off { background: #e8ecf3; color: var(--fg); }
+
+.code { font-family: ui-monospace, monospace; font-size: 1.7rem; letter-spacing: 5px; text-align: center; background: var(--bg); padding: 12px; border-radius: 10px; margin: 10px 0; font-weight: 800; }
+.small-code { font-size: 1.2rem; margin: 0 0 6px; padding: 6px; }
+
+/* ---------- Barra de pestañas ---------- */
+.tabs { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 1000; }
+.tab { flex: 1; border: 0; background: none; padding: 8px 0; font-size: 1.25rem; cursor: pointer; color: var(--muted); display: flex; flex-direction: column; align-items: center; }
+.tab span { font-size: .72rem; }
+.tab.active { color: var(--primary); font-weight: 700; }
+
+/* ---------- Ventanas ---------- */
+dialog { border: 0; border-radius: var(--radius); padding: 20px; width: min(92vw, 380px); color: var(--fg); }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+dialog h3 { margin-top: 0; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.modal-actions .btn { flex: 1; margin: 0; }
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: var(--primary); color: #fff; padding: 12px 16px; border-radius: 12px; z-index: 3000; width: max-content; max-width: calc(100vw - 32px); box-shadow: 0 6px 18px rgba(0,0,0,.25); font-size: .92rem; }
+
+/* ---------- Marcadores del mapa ---------- */
+.veh-wrap { background: none; border: 0; }
+.veh { display: inline-flex; align-items: center; gap: 2px; background: #fff; border: 2px solid var(--c, #f2c200); border-radius: 999px; padding: 1px 6px 1px 3px; box-shadow: 0 1px 4px rgba(0,0,0,.35); font-size: 15px; line-height: 20px; white-space: nowrap; }
+.veh b { font-size: 11px; color: var(--c, var(--fg)); }
+.veh.taxi { --c: #f2c200; padding: 1px 4px; }
+.veh.busy { opacity: .55; filter: grayscale(.6); }
+.veh.self { background: var(--primary); }
+.veh.self b { color: #fff; }
+.me-icon { width: 18px; height: 18px; border-radius: 50%; background: #2e86ab; border: 3px solid #fff; box-shadow: 0 0 0 5px rgba(46,134,171,.3); }
+.leaflet-popup-content { font-size: .9rem; line-height: 1.45; }
+
+/* ---------- Pantallas grandes ---------- */
+@media (min-width: 900px) {
+  .app { display: grid; grid-template-columns: 1fr 420px; grid-template-rows: auto 1fr; }
+  .topbar { grid-column: 1 / -1; }
+  .map-wrap { height: auto; grid-row: 2; }
+  .panel { grid-row: 2; }
+  .tabs { left: auto; width: 420px; }
+  .toast { left: auto; right: 16px; transform: none; }
+}
+</style>
+</head>
+<body>
+  <!-- ============ INICIO DE SESIÓN / CREAR CUENTA ============ -->
+  <div class="screen auth" id="authScreen">
+    <div class="auth-box">
+      <div class="auth-logo">🚌🚕</div>
+      <h1>MueveT</h1>
+      <p class="muted center">Camiones y taxis de tu ciudad, en vivo.</p>
+
+      <div class="seg" role="tablist">
+        <button class="seg-btn active" data-auth="login" type="button">Iniciar sesión</button>
+        <button class="seg-btn" data-auth="register" type="button">Crear cuenta</button>
+      </div>
+
+      <form id="loginForm" class="auth-form" novalidate>
+        <label class="field">Correo<input type="email" name="email" autocomplete="email" required></label>
+        <label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
+        <label class="check"><input type="checkbox" name="remember" checked> Mantener sesión iniciada</label>
+        <p class="error" data-error></p>
+        <button class="btn primary" type="submit">Entrar</button>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden" novalidate>
+        <div class="field">¿Cómo vas a usar la app?</div>
+        <div class="roles">
+          <label class="role"><input type="radio" name="role" value="pasajero" checked><span>🧍<b>Pasajero</b></span></label>
+          <label class="role"><input type="radio" name="role" value="camion"><span>🚌<b>Chofer de camión</b></span></label>
+          <label class="role"><input type="radio" name="role" value="taxi"><span>🚕<b>Taxista</b></span></label>
+        </div>
+        <label class="field">Nombre completo<input name="name" autocomplete="name" required></label>
+        <label class="field">Correo<input type="email" name="email" autocomplete="email" required></label>
+        <label class="field">Teléfono<input type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="33 1234 5678" required></label>
+        <label class="field">Contraseña<input type="password" name="password" autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" required></label>
+        <label class="field driver-only camion-only hidden">Ruta que manejas<select name="routeId"></select></label>
+        <label class="field driver-only hidden"><span data-plate-label>Placas</span><input name="plate" autocapitalize="characters"></label>
+        <p class="error" data-error></p>
+        <button class="btn primary" type="submit">Crear cuenta</button>
+      </form>
+      <p class="muted small center">Por ahora tus datos se guardan solo en este dispositivo.</p>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div class="screen app hidden" id="appScreen">
+    <header class="topbar">
+      <div class="brand">🚌 MueveT</div>
+      <button class="wallet-chip" id="walletChip" type="button">$0.00</button>
+    </header>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-tools">
+        <button class="map-btn" id="locateBtn" type="button" title="Centrar en mí">📍</button>
+        <button class="map-btn" id="pickBtn" type="button" title="Elegir mi ubicación en el mapa">✋</button>
+        <button class="map-btn" id="allBtn" type="button" title="Ver toda la ciudad">🗺️</button>
+      </div>
+      <div class="map-banner hidden" id="mapBanner"></div>
+    </div>
+
+    <main class="panel" id="panel"></main>
+    <nav class="tabs" id="tabs"></nav>
+  </div>
+
+  <dialog id="modal">
+    <div id="modalBody"></div>
+    <div class="modal-actions" id="modalActions"></div>
+  </dialog>
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+"use strict";
+// Cálculos de distancia, rutas y tiempos de llegada.
+const Geo = (() => {
+  const toRad = (d) => (d * Math.PI) / 180;
+
+  function distKm(a, b) {
+    const R = 6371, dLat = toRad(b[0] - a[0]), dLon = toRad(b[1] - a[1]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const moveToward = (from, to, km) => {
+    const d = distKm(from, to);
+    return d <= km ? [to[0], to[1]] : lerp(from, to, km / d);
+  };
+
+  // Cada ruta es de ida y vuelta: se agregan las paradas de regreso para formar un circuito continuo.
+  function buildRoute(raw) {
+    const stops = [...raw.stops, ...raw.stops.slice(0, -1).reverse().map(([n, a, b]) => [n + " (regreso)", a, b])];
+    const cum = [0];
+    for (let i = 1; i < stops.length; i++) cum.push(cum[i - 1] + distKm(stops[i - 1].slice(1), stops[i].slice(1)));
+    return { ...raw, stops, cum, length: cum[cum.length - 1], terminal: raw.stops.length - 1 };
+  }
+
+  function posOnRoute(r, s) {
+    for (let i = 1; i < r.cum.length; i++) {
+      if (s <= r.cum[i]) {
+        const t = (s - r.cum[i - 1]) / (r.cum[i] - r.cum[i - 1] || 1);
+        return lerp(r.stops[i - 1].slice(1), r.stops[i].slice(1), t);
+      }
+    }
+    return r.stops[r.stops.length - 1].slice(1);
+  }
+
+  // Índice de la última parada por la que ya pasó un camión en la posición s
+  const lastStopIdx = (r, s) => { let i = 0; while (i + 1 < r.cum.length && r.cum[i + 1] <= s) i++; return i; };
+
+  // Ubica un punto GPS sobre la ruta. Como la ida y la vuelta pasan por las mismas calles,
+  // se elige la posición más cercana a la anterior para no "brincar" de sentido.
+  function projectOnRoute(r, p, prevS) {
+    const k = Math.cos(toRad(p[0]));
+    const cands = [];
+    for (let i = 1; i < r.stops.length; i++) {
+      const a = r.stops[i - 1].slice(1), b = r.stops[i].slice(1);
+      const vx = (b[1] - a[1]) * k, vy = b[0] - a[0], len2 = vx * vx + vy * vy || 1e-12;
+      const t = Math.max(0, Math.min(1, ((p[1] - a[1]) * k * vx + (p[0] - a[0]) * vy) / len2));
+      cands.push({ s: r.cum[i - 1] + t * (r.cum[i] - r.cum[i - 1]), d: distKm(p, lerp(a, b, t)) });
+    }
+    const min = Math.min(...cands.map((c) => c.d));
+    const close = cands.filter((c) => c.d <= min + 0.05);
+    if (prevS == null) return close[0];
+    const delta = (c) => {
+      let x = (((c.s - prevS) % r.length) + r.length) % r.length;
+      if (x > r.length - 0.3) x -= r.length;
+      return Math.abs(x);
+    };
+    return close.sort((a, b) => delta(a) - delta(b))[0];
+  }
+
+  // Segundos y km para que un camión (posición s, segundos detenido restantes) llegue a la parada i
+  function busEta(r, s, dwell, i) {
+    const v = CONFIG.busSpeedKmh / 3600;
+    const last = lastStopIdx(r, s);
+    if (dwell > 0 && last === i) return { sec: 0, km: 0 };
+    let km, stopsBetween;
+    if (s <= r.cum[i] + 1e-6) { km = r.cum[i] - s; stopsBetween = Math.max(0, i - last - 1); }
+    else { km = r.length - s + r.cum[i]; stopsBetween = r.stops.length - 1 - last + i; }
+    return { sec: km / v + stopsBetween * CONFIG.dwellSeconds + (dwell || 0), km };
+  }
+
+  const taxiEtaSec = (km) => (km * CONFIG.roadFactor) / (CONFIG.taxiSpeedKmh / 3600);
+
+  return { distKm, lerp, moveToward, buildRoute, posOnRoute, lastStopIdx, projectOnRoute, busEta, taxiEtaSec };
+})();
+</script>
+  <script>
+"use strict";
+// Configuración y rutas. Los montos están en centavos (MXN) para evitar errores de redondeo.
+const CONFIG = {
+  center: [20.6767, -103.3475],
+  busSpeedKmh: 18,      // velocidad promedio de camión en ciudad
+  taxiSpeedKmh: 24,     // velocidad promedio de taxi
+  dwellSeconds: 30,     // tiempo detenido en cada parada
+  roadFactor: 1.3,      // las calles no van en línea recta
+  busFare: 1100,        // pasaje de camión: $11.00
+  taxiBase: 1310,       // banderazo: $13.10
+  taxiPerKm: 750,       // $7.50 por km
+  commission: 0.15,     // comisión de la app en cada compra (15%)
+  ticketMinutes: 60,    // vigencia del boleto
+  welcomeBonus: 5000,   // saldo de regalo al crear cuenta de pasajero ($50)
+  liveTimeoutMs: 30000, // un chofer que no manda ubicación en 30 s deja de aparecer
+  requestTimeoutMs: 90000, // una solicitud de taxi sin respuesta se cancela en 90 s
+  demoDrivers: true,    // choferes de ejemplo para que el mapa no esté vacío
+};
+
+const ROUTES = [
+  {
+    id: "R1", name: "Ruta 1 · Centro – Minerva", color: "#e4572e",
+    stops: [
+      ["Catedral", 20.6767, -103.3470], ["Av. Juárez / 16 de Sep.", 20.6741, -103.3505],
+      ["Federalismo", 20.6738, -103.3577], ["Av. Chapultepec", 20.6735, -103.3685],
+      ["Av. Américas", 20.6740, -103.3780], ["Minerva", 20.6745, -103.3880],
+    ],
+  },
+  {
+    id: "R2", name: "Ruta 2 · Plaza del Sol – Centro", color: "#2e86ab",
+    stops: [
+      ["Plaza del Sol", 20.6497, -103.4012], ["López Mateos / Niños Héroes", 20.6610, -103.3925],
+      ["Arcos de Guadalajara", 20.6730, -103.3887], ["Av. Vallarta / Chapultepec", 20.6752, -103.3690],
+      ["Parque Revolución", 20.6742, -103.3555], ["Catedral", 20.6767, -103.3470],
+    ],
+  },
+  {
+    id: "R3", name: "Ruta 3 · Centro – Tlaquepaque", color: "#3bb273",
+    stops: [
+      ["San Juan de Dios", 20.6745, -103.3390], ["Plaza Patria Oriente", 20.6660, -103.3350],
+      ["Revolución / Gigantes", 20.6555, -103.3280], ["Glorieta Niños Héroes Sur", 20.6450, -103.3200],
+      ["Tlaquepaque Centro", 20.6405, -103.3115],
+    ],
+  },
+].map(Geo.buildRoute);
+
+const routeById = (id) => ROUTES.find((r) => r.id === id);
+
+// Destinos para taxi = todas las paradas conocidas, sin repetir
+const DESTS = [...new Map(ROUTES.flatMap((r) => r.stops.slice(0, r.terminal + 1)).map((s) => [s[0], s])).values()]
+  .map(([name, lat, lng]) => ({ name, lat, lng }));
+</script>
+  <script>
+"use strict";
+/*
+ * Almacén de datos local: cuentas, sesiones, saldo, boletos y viajes.
+ * Por ahora todo se guarda en este navegador (localStorage) y se comparte entre
+ * pestañas abiertas. Todas las funciones son async y tienen la misma forma que
+ * tendrá la API del servidor, así que después solo se cambia este archivo.
+ */
+const Store = (() => {
+  const DB_KEY = "muevet_db_v2";
+  const LIVE_KEY = "muevet_live_v1";
+  const SESSION_KEY = "muevet_session";
+
+  class AppError extends Error {}
+  const fail = (msg) => { throw new AppError(msg); };
+
+  /* ---------- Persistencia ---------- */
+  const empty = () => ({ nextId: 1, users: [], transactions: [], tickets: [], trips: [], platform: [] });
+  let memDb = null, memLive = {};
+  function read(key, fallback) {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+  }
+  function write(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* sin almacenamiento */ } }
+  const loadDb = () => read(DB_KEY, null) ?? memDb ?? empty();
+  const loadLive = () => read(LIVE_KEY, null) ?? memLive;
+
+  // Avisos de cambios a otras pestañas
+  const listeners = new Set();
+  const chan = "BroadcastChannel" in window ? new BroadcastChannel("muevet") : null;
+  const emit = () => listeners.forEach((f) => f());
+  chan?.addEventListener("message", emit);
+  window.addEventListener("storage", (e) => { if (e.key === DB_KEY || e.key === LIVE_KEY) emit(); });
+  const announce = () => { chan?.postMessage("change"); emit(); };
+
+  // Lee, modifica y guarda en un solo paso
+  function mutate(fn) {
+    const db = loadDb();
+    const result = fn(db);
+    memDb = db; write(DB_KEY, db); announce();
+    return result;
+  }
+
+  /* ---------- Contraseñas (PBKDF2, nunca se guarda la contraseña) ---------- */
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const randomHex = (n) => hex(crypto.getRandomValues(new Uint8Array(n)));
+  async function hashPassword(password, salt) {
+    if (!crypto.subtle) fail("Tu navegador no permite crear cuentas seguras. Actualízalo o usa Chrome/Safari.");
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations: 120000 }, key, 256);
+    return hex(bits);
+  }
+
+  /* ---------- Utilidades ---------- */
+  const now = () => Date.now();
+  const fee = (base) => Math.round(base * CONFIG.commission);
+  const publicUser = (u) => u && ({
+    id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role,
+    routeId: u.routeId ?? null, plate: u.plate ?? null, balance: u.balance,
+  });
+  const findUser = (db, id) => db.users.find((u) => u.id === id) ?? fail("Cuenta no encontrada.");
+
+  function ledger(db, user, amount, description) {
+    if (amount < 0 && user.balance + amount < 0) fail("Saldo insuficiente.");
+    user.balance += amount;
+    db.transactions.push({ id: db.nextId++, userId: user.id, amount, description, at: now() });
+  }
+  const platformFee = (db, amount, description) => db.platform.push({ amount, description, at: now() });
+
+  /* ---------- Cuentas y sesión ---------- */
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  async function register({ name, email, phone, password, role, routeId, plate }) {
+    name = (name ?? "").trim(); email = (email ?? "").trim().toLowerCase();
+    phone = (phone ?? "").replace(/[^\d+]/g, ""); plate = (plate ?? "").trim().toUpperCase();
+    if (name.length < 2) fail("Escribe tu nombre.");
+    if (!EMAIL_RE.test(email)) fail("Escribe un correo válido.");
+    if (phone.replace(/\D/g, "").length < 10) fail("Escribe un teléfono de 10 dígitos.");
+    if ((password ?? "").length < 6) fail("La contraseña debe tener al menos 6 caracteres.");
+    if (!["pasajero", "camion", "taxi"].includes(role)) fail("Elige el tipo de cuenta.");
+    if (role === "camion" && !routeById(routeId)) fail("Elige la ruta que manejas.");
+    if (role !== "pasajero" && plate.length < 3) fail(role === "taxi" ? "Escribe las placas del taxi." : "Escribe el número de unidad.");
+    if (loadDb().users.some((u) => u.email === email)) fail("Ya existe una cuenta con ese correo.");
+
+    const salt = randomHex(16);
+    const passHash = await hashPassword(password, salt);
+    const user = mutate((db) => {
+      if (db.users.some((u) => u.email === email)) fail("Ya existe una cuenta con ese correo.");
+      const u = {
+        id: db.nextId++, name, email, phone, role, passHash, salt, balance: 0, createdAt: now(),
+        routeId: role === "camion" ? routeId : null, plate: role === "pasajero" ? null : plate,
+      };
+      db.users.push(u);
+      if (role === "pasajero" && CONFIG.welcomeBonus > 0) ledger(db, u, CONFIG.welcomeBonus, "Saldo de bienvenida");
+      return u;
+    });
+    startSession(user.id, true);
+    return publicUser(user);
+  }
+
+  async function login(email, password, remember) {
+    email = (email ?? "").trim().toLowerCase();
+    const u = loadDb().users.find((x) => x.email === email);
+    // Se calcula el hash aunque no exista la cuenta para no revelar qué correos están registrados
+    const h = await hashPassword(password ?? "", u?.salt ?? "x");
+    if (!u || h !== u.passHash) fail("Correo o contraseña incorrectos.");
+    startSession(u.id, remember);
+    return publicUser(u);
+  }
+
+  // La sesión vive en la pestaña (sessionStorage) y, si eliges "mantener sesión", también en el navegador.
+  function startSession(userId, remember) {
+    const s = JSON.stringify({ userId, at: now() });
+    try { sessionStorage.setItem(SESSION_KEY, s); } catch {}
+    try { if (remember) localStorage.setItem(SESSION_KEY, s); else localStorage.removeItem(SESSION_KEY); } catch {}
+  }
+  async function logout() {
+    try { sessionStorage.removeItem(SESSION_KEY); localStorage.removeItem(SESSION_KEY); } catch {}
+  }
+  async function currentUser() {
+    let s = null;
+    try { s = JSON.parse(sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY) || "null"); } catch {}
+    if (!s) return null;
+    return publicUser(loadDb().users.find((u) => u.id === s.userId)) ?? null;
+  }
+  const getUser = (id) => publicUser(loadDb().users.find((u) => u.id === id));
+
+  /* ---------- Cartera ---------- */
+  async function wallet(userId) {
+    const db = loadDb();
+    return {
+      balance: findUser(db, userId).balance,
+      history: db.transactions.filter((t) => t.userId === userId).sort((a, b) => b.id - a.id).slice(0, 50),
+    };
+  }
+  async function topup(userId, amount) {
+    if (!Number.isInteger(amount) || amount < 1000 || amount > 200000) fail("La recarga debe ser de $10 a $2,000.");
+    // Aquí después se conecta la pasarela de pago real. Por ahora es un pago de prueba.
+    mutate((db) => ledger(db, findUser(db, userId), amount, "Recarga (pago de prueba)"));
+  }
+
+  /* ---------- Boletos de camión ---------- */
+  const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => CODE_CHARS[b % CODE_CHARS.length]).join("");
+
+  async function buyTicket(userId, routeId) {
+    const r = routeById(routeId) ?? fail("Ruta no válida.");
+    return mutate((db) => {
+      const u = findUser(db, userId);
+      if (u.role !== "pasajero") fail("Solo los pasajeros compran boletos.");
+      const base = CONFIG.busFare, f = fee(base);
+      ledger(db, u, -(base + f), `Pasaje ${r.id}`);
+      platformFee(db, f, `Comisión pasaje ${r.id}`);
+      let code; do code = newCode(); while (db.tickets.some((t) => t.code === code));
+      const t = { code, userId, routeId, base, fee: f, at: now(), usedAt: null, driverId: null };
+      db.tickets.push(t);
+      return { ...t, expiresAt: t.at + CONFIG.ticketMinutes * 60000 };
+    });
+  }
+  async function myTickets(userId) {
+    const limit = now() - CONFIG.ticketMinutes * 60000;
+    return loadDb().tickets.filter((t) => t.userId === userId && !t.usedAt && t.at > limit)
+      .map((t) => ({ ...t, expiresAt: t.at + CONFIG.ticketMinutes * 60000 })).reverse();
+  }
+  async function validateTicket(driverId, code) {
+    code = (code ?? "").trim().toUpperCase();
+    return mutate((db) => {
+      const d = findUser(db, driverId);
+      if (d.role !== "camion") fail("Solo los choferes de camión validan boletos.");
+      const t = db.tickets.find((x) => x.code === code) ?? fail("Ese código no existe.");
+      if (t.usedAt) fail("Ese boleto ya se usó.");
+      if (t.routeId !== d.routeId) fail(`Ese boleto es de la ${routeById(t.routeId).name}.`);
+      if (now() - t.at > CONFIG.ticketMinutes * 60000) fail("Ese boleto ya venció.");
+      t.usedAt = now(); t.driverId = d.id;
+      ledger(db, d, t.base, `Pasaje validado ${t.code}`);
+      return { ...t, passenger: findUser(db, t.userId).name };
+    });
+  }
+
+  /* ---------- Taxis ---------- */
+  function quote(from, dest) {
+    const km = Geo.distKm(from, [dest.lat, dest.lng]) * CONFIG.roadFactor;
+    const base = Math.round(CONFIG.taxiBase + km * CONFIG.taxiPerKm);
+    const f = fee(base);
+    return { km, base, fee: f, total: base + f };
+  }
+
+  const ACTIVE = ["requested", "accepted", "arrived", "ontrip"];
+  function expire(db) {
+    db.trips.forEach((t) => {
+      if (t.status === "requested" && now() - t.at > CONFIG.requestTimeoutMs) { t.status = "expired"; t.updatedAt = now(); }
+    });
+  }
+  const isBusy = (db, driverId) => db.trips.some((t) => t.driverId === driverId && ACTIVE.includes(t.status));
+
+  async function requestTrip(userId, driver, destIndex, pickup) {
+    const dest = DESTS[destIndex] ?? fail("Elige un destino.");
+    if (!driver || driver.kind !== "taxi") fail("Ese taxi ya no está disponible.");
+    return mutate((db) => {
+      expire(db);
+      const u = findUser(db, userId);
+      if (u.role !== "pasajero") fail("Solo los pasajeros piden taxi.");
+      if (db.trips.some((t) => t.passengerId === userId && ACTIVE.includes(t.status))) fail("Ya tienes un viaje en curso.");
+      if (isBusy(db, driver.id)) fail("Ese taxi acaba de tomar otro viaje.");
+      const q = quote(pickup, dest);
+      if (u.balance < q.total) fail(`Saldo insuficiente: el viaje cuesta ${money(q.total)}.`);
+      const t = {
+        id: db.nextId++, passengerId: userId, passengerName: u.name, passengerPhone: u.phone,
+        driverId: driver.id, driverName: driver.name, plate: driver.plate, demo: !!driver.demo,
+        pickup, dest, base: q.base, fee: q.fee, total: q.total, km: q.km,
+        status: "requested", payment: null, at: now(), updatedAt: now(), botPos: driver.demo ? [driver.lat, driver.lng] : null,
+      };
+      db.trips.push(t);
+      return t;
+    });
+  }
+
+  // Viaje actual del usuario (o el último que terminó hace poco, para avisar cómo terminó)
+  async function currentTrip(user) {
+    const db = loadDb();
+    const key = user.role === "pasajero" ? "passengerId" : "driverId";
+    const mine = db.trips.filter((t) => t[key] === user.id).sort((a, b) => b.id - a.id);
+    return mine.find((t) => ACTIVE.includes(t.status) && !(t.status === "requested" && now() - t.at > CONFIG.requestTimeoutMs))
+      ?? mine.find((t) => now() - t.updatedAt < 20000) ?? null;
+  }
+
+  // Cambios de estado del viaje. who = "passenger" | "driver" | "bot"
+  const TRANSITIONS = {
+    accept: { from: ["requested"], to: "accepted", who: ["driver", "bot"] },
+    reject: { from: ["requested"], to: "rejected", who: ["driver", "bot"] },
+    arrived: { from: ["accepted"], to: "arrived", who: ["driver", "bot"] },
+    start: { from: ["arrived"], to: "ontrip", who: ["driver", "passenger", "bot"] },
+    finish: { from: ["ontrip"], to: "done", who: ["driver", "bot"] },
+    cancel: { from: ["requested", "accepted", "arrived"], to: "cancelled", who: ["driver", "passenger"] },
+  };
+  async function tripAction(tripId, action, actor) {
+    return mutate((db) => {
+      expire(db);
+      const t = db.trips.find((x) => x.id === tripId) ?? fail("Viaje no encontrado.");
+      const tr = TRANSITIONS[action] ?? fail("Acción no válida.");
+      const role = actor === "bot" ? "bot" : actor === t.passengerId ? "passenger" : actor === t.driverId ? "driver" : null;
+      if (!role || !tr.who.includes(role)) fail("No puedes hacer eso en este viaje.");
+      if (!tr.from.includes(t.status)) fail("El viaje ya cambió de estado.");
+      t.status = tr.to; t.updatedAt = now();
+      if (t.status === "cancelled") t.cancelledBy = role;
+      if (t.status === "done") {
+        const p = findUser(db, t.passengerId);
+        if (p.balance >= t.total) {
+          ledger(db, p, -t.total, `Taxi ${t.plate} → ${t.dest.name}`);
+          platformFee(db, t.fee, `Comisión taxi viaje ${t.id}`);
+          const d = db.users.find((u) => u.id === t.driverId);
+          if (d) ledger(db, d, t.base, `Viaje ${t.id} → ${t.dest.name}`);
+          t.payment = "app";
+        } else t.payment = "efectivo";
+      }
+      return t;
+    });
+  }
+  // Los taxis de ejemplo guardan su posición dentro del viaje
+  async function setBotPos(tripId, pos) {
+    mutate((db) => { const t = db.trips.find((x) => x.id === tripId); if (t) t.botPos = pos; });
+  }
+  async function busyDriverIds() {
+    const db = loadDb();
+    return new Set(db.trips.filter((t) => ACTIVE.includes(t.status) && !(t.status === "requested" && now() - t.at > CONFIG.requestTimeoutMs)).map((t) => t.driverId));
+  }
+  const activeBotTrips = () => loadDb().trips.filter((t) => t.demo && ACTIVE.includes(t.status));
+
+  /* ---------- Ubicación en vivo de choferes ---------- */
+  function setLocation(user, loc) {
+    const live = loadLive();
+    live[user.id] = {
+      id: user.id, kind: user.role, name: user.name, plate: user.plate, routeId: user.routeId,
+      lat: loc.lat, lng: loc.lng, s: loc.s ?? null, dwell: 0, demo: false, at: now(),
+    };
+    memLive = live; write(LIVE_KEY, live); chan?.postMessage("change");
+  }
+  function clearLocation(userId) {
+    const live = loadLive();
+    delete live[userId];
+    memLive = live; write(LIVE_KEY, live); chan?.postMessage("change");
+  }
+  function liveDrivers() {
+    return Object.values(loadLive()).filter((d) => now() - d.at < CONFIG.liveTimeoutMs);
+  }
+
+  return {
+    AppError, onChange: (f) => listeners.add(f),
+    register, login, logout, currentUser, getUser,
+    wallet, topup, buyTicket, myTickets, validateTicket,
+    quote, requestTrip, currentTrip, tripAction, setBotPos, busyDriverIds, activeBotTrips,
+    setLocation, clearLocation, liveDrivers,
+  };
+})();
+
+const money = (cents) => "$" + (cents / 100).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+</script>
+  <script>
+"use strict";
+/*
+ * Choferes de ejemplo para que el mapa tenga movimiento mientras no hay choferes reales.
+ * Sus posiciones dependen solo de la hora, así que todas las pestañas los ven en el mismo lugar.
+ * Se apagan con CONFIG.demoDrivers = false.
+ */
+const Sim = (() => {
+  const BUS_DRIVERS = ["Don Ramiro", "Lupita", "Chuy", "Toño", "Martha", "Beto", "Rafa", "Elena", "Paco"];
+  const TAXI_DRIVERS = ["Juan P.", "María L.", "Roberto G.", "Ana S.", "Luis M.", "Carmen R.", "Pedro V.", "Sofía H."];
+  const v = CONFIG.busSpeedKmh / 3600;
+
+  // Línea de tiempo de cada ruta: tramo en movimiento + espera en cada parada
+  const timelines = ROUTES.map((r) => {
+    const parts = [];
+    for (let i = 1; i < r.stops.length; i++) {
+      parts.push({ type: "move", s0: r.cum[i - 1], s1: r.cum[i], dur: (r.cum[i] - r.cum[i - 1]) / v });
+      parts.push({ type: "dwell", s0: r.cum[i], dur: CONFIG.dwellSeconds });
+    }
+    return { r, parts, total: parts.reduce((a, p) => a + p.dur, 0) };
+  });
+
+  function busAt(tl, t) {
+    let x = ((t % tl.total) + tl.total) % tl.total;
+    for (const p of tl.parts) {
+      if (x < p.dur) {
+        if (p.type === "dwell") return { s: p.s0 >= tl.r.length - 1e-9 ? 0 : p.s0, dwell: p.dur - x };
+        return { s: p.s0 + (p.s1 - p.s0) * (x / p.dur), dwell: 0 };
+      }
+      x -= p.dur;
+    }
+    return { s: 0, dwell: 0 };
+  }
+
+  // Taxis: recorren óvalos alrededor del centro a ~25 km/h
+  const taxiDefs = TAXI_DRIVERS.map((name, i) => ({
+    id: "demo-t" + i, name, plate: `TX-${2300 + i * 7}`, rating: (4.4 + ((i * 37) % 6) / 10).toFixed(1),
+    ry: 0.006 + (i % 4) * 0.004, rx: 0.008 + ((i + 1) % 3) * 0.006,
+    oy: ((i % 3) - 1) * 0.006, ox: ((i % 4) - 1.5) * 0.007, ph: i * 0.8, dir: i % 2 ? 1 : -1,
+  }));
+
+  function drivers(nowMs, busy, botTrips) {
+    if (!CONFIG.demoDrivers) return [];
+    const t = nowMs / 1000;
+    const list = [];
+    timelines.forEach((tl, ri) => {
+      for (let k = 0; k < 3; k++) {
+        const { s, dwell } = busAt(tl, t + (tl.total * k) / 3);
+        const [lat, lng] = Geo.posOnRoute(tl.r, s);
+        list.push({
+          id: `demo-b${ri}${k}`, kind: "camion", name: BUS_DRIVERS[(ri * 3 + k) % BUS_DRIVERS.length],
+          plate: `JAL-${100 + ri * 10 + k}`, routeId: tl.r.id, lat, lng, s, dwell, demo: true,
+        });
+      }
+    });
+    const tripByDriver = new Map(botTrips.map((x) => [x.driverId, x]));
+    taxiDefs.forEach((d) => {
+      const trip = tripByDriver.get(d.id);
+      let pos;
+      if (trip?.botPos) pos = trip.botPos;
+      else {
+        const R = (d.rx + d.ry) / 2 * 111, w = (6.9 / 1000) / R; // 6.9 m/s
+        const a = d.ph + d.dir * w * t;
+        pos = [CONFIG.center[0] + d.oy + d.ry * Math.sin(a), CONFIG.center[1] + d.ox + d.rx * Math.cos(a)];
+      }
+      list.push({ id: d.id, kind: "taxi", name: d.name, plate: d.plate, rating: d.rating, lat: pos[0], lng: pos[1], demo: true, busy: busy.has(d.id) });
+    });
+    return list;
+  }
+
+  // Avanza los viajes con taxis de ejemplo (aceptan solos, llegan por ti y te llevan)
+  async function tickTrips(dtSec) {
+    const step = (CONFIG.taxiSpeedKmh * 6 / 3600) * dtSec; // van x6 más rápido para que la demo no tarde
+    for (const trip of Store.activeBotTrips()) {
+      try {
+        if (trip.status === "requested" && Date.now() - trip.at > 2500) await Store.tripAction(trip.id, "accept", "bot");
+        else if (trip.status === "accepted") {
+          const pos = Geo.moveToward(trip.botPos, trip.pickup, step);
+          await Store.setBotPos(trip.id, pos);
+          if (Geo.distKm(pos, trip.pickup) < 0.001) await Store.tripAction(trip.id, "arrived", "bot");
+        } else if (trip.status === "ontrip") {
+          const dest = [trip.dest.lat, trip.dest.lng];
+          const pos = Geo.moveToward(trip.botPos, dest, step);
+          await Store.setBotPos(trip.id, pos);
+          if (Geo.distKm(pos, dest) < 0.001) await Store.tripAction(trip.id, "finish", "bot");
+        }
+      } catch { /* otra pestaña ya lo movió */ }
+    }
+  }
+
+  return { drivers, tickTrips };
+})();
+</script>
+  <script>
+"use strict";
+
+/* ===================== Utilidades ===================== */
+const $ = (s, root = document) => root.querySelector(s);
+const $$ = (s, root = document) => [...root.querySelectorAll(s)];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtDist = (km) => (km < 1 ? Math.round(km * 1000) + " m" : km.toFixed(1) + " km");
+const fmtMin = (sec) => (sec < 60 ? "< 1 min" : Math.round(sec / 60) + " min");
+const fmtTime = (ms) => new Date(ms).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" });
+const ROLE_NAME = { pasajero: "Pasajero", camion: "Chofer de camión", taxi: "Taxista" };
+
+// Solo reemplaza el HTML si cambió (así no se pierden toques en botones que se redibujan)
+function setHTML(el, html) { if (el && el._html !== html) { el.innerHTML = html; el._html = html; } }
+
+function toast(msg, ms = 3500) {
+  const t = $("#toast");
+  t.textContent = msg; t.classList.remove("hidden");
+  clearTimeout(t._timer); t._timer = setTimeout(() => t.classList.add("hidden"), ms);
+}
+
+function modal(html, actions = [["Listo", "primary"]]) {
+  $("#modalBody").innerHTML = html;
+  const box = $("#modalActions");
+  box.innerHTML = "";
+  actions.forEach(([label, cls, fn]) => {
+    const b = document.createElement("button");
+    b.className = "btn " + cls; b.type = "button"; b.textContent = label;
+    b.onclick = async () => {
+      if (fn) { try { if (await fn() === false) return; } catch (e) { return showError(e); } }
+      $("#modal").close();
+    };
+    box.appendChild(b);
+  });
+  if (!$("#modal").open) $("#modal").showModal();
+}
+function showError(e) {
+  if (!(e instanceof Store.AppError)) console.error(e);
+  const msg = e instanceof Store.AppError ? e.message : "Algo salió mal. Intenta de nuevo.";
+  if ($("#modal").open) { const p = $("#modalBody .error") ?? $("#modalBody").appendChild(Object.assign(document.createElement("p"), { className: "error" })); p.textContent = msg; }
+  else toast("⚠️ " + msg);
+}
+async function run(fn) { try { await fn(); } catch (e) { showError(e); } }
+
+/* ===================== Estado ===================== */
+const S = {
+  user: null, view: null,
+  me: [CONFIG.center[0] - 0.004, CONFIG.center[1] - 0.006], meSource: "ejemplo", gpsWatch: null,
+  pickMode: false, drivers: [], trip: null,
+  filters: { camion: true, taxi: true, routes: new Set(ROUTES.map((r) => r.id)) },
+  routeId: ROUTES[0].id, stopIdx: 0, destIdx: 0,
+  // Solo choferes
+  duty: false, pos: null, posSource: null, s: null, simulate: false, dwell: 0, wander: null,
+};
+// Avisos de fin de viaje ya mostrados (por usuario, para no repetirlos en otra pestaña)
+const shownKey = (id) => `muevet_shown_${S.user.id}_${id}`;
+const wasShown = (id) => { try { return !!localStorage.getItem(shownKey(id)); } catch { return false; } };
+const markShown = (id) => { try { localStorage.setItem(shownKey(id), "1"); } catch {} };
+
+/* ===================== Inicio de sesión / registro ===================== */
+function initAuth() {
+  $("#registerForm [name=routeId]").innerHTML = ROUTES.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+
+  $$("[data-auth]").forEach((b) => b.addEventListener("click", () => {
+    $$("[data-auth]").forEach((x) => x.classList.toggle("active", x === b));
+    $("#loginForm").classList.toggle("hidden", b.dataset.auth !== "login");
+    $("#registerForm").classList.toggle("hidden", b.dataset.auth !== "register");
+  }));
+
+  const syncRole = () => {
+    const role = $("#registerForm [name=role]:checked").value;
+    $$("#registerForm .driver-only").forEach((el) => el.classList.toggle("hidden", role === "pasajero"));
+    $$("#registerForm .camion-only").forEach((el) => el.classList.toggle("hidden", role !== "camion"));
+    $("[data-plate-label]").textContent = role === "camion" ? "Número de unidad (económico)" : "Placas del taxi";
+  };
+  $$("#registerForm [name=role]").forEach((r) => r.addEventListener("change", syncRole));
+
+  const submit = (form, fn) => form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("button[type=submit]", form), err = $("[data-error]", form);
+    err.textContent = ""; btn.disabled = true;
+    try { await fn(Object.fromEntries(new FormData(form))); form.reset(); syncRole(); }
+    catch (ex) { err.textContent = ex instanceof Store.AppError ? ex.message : "No se pudo completar. Intenta de nuevo."; if (!(ex instanceof Store.AppError)) console.error(ex); }
+    finally { btn.disabled = false; }
+  });
+  submit($("#loginForm"), async (f) => enterApp(await Store.login(f.email, f.password, !!f.remember)));
+  submit($("#registerForm"), async (f) => {
+    const user = await Store.register(f);
+    enterApp(user);
+    toast(user.role === "pasajero" ? `¡Bienvenido, ${user.name}! Te regalamos ${money(CONFIG.welcomeBonus)} de saldo.` : `¡Bienvenido, ${user.name}! Activa "En servicio" para aparecer en el mapa.`, 5000);
+  });
+}
+
+function enterApp(user) {
+  S.user = user;
+  $("#authScreen").classList.add("hidden");
+  $("#appScreen").classList.remove("hidden");
+  initMap();
+  map.invalidateSize();
+  const views = VIEWS[user.role];
+  $("#tabs").innerHTML = views.map(([id, icon, label]) => `<button class="tab" data-view="${id}" type="button">${icon}<span>${label}</span></button>`).join("");
+  $$("#tabs .tab").forEach((t) => t.addEventListener("click", () => show(t.dataset.view)));
+  if (user.role === "pasajero") startPassengerGps();
+  else S.pos = user.role === "camion" ? routeById(user.routeId).stops[0].slice(1) : [...CONFIG.center];
+  show(views[0][0]);
+  tick();
+}
+
+async function logout() {
+  if (S.duty) setDuty(false);
+  if (S.gpsWatch != null) navigator.geolocation.clearWatch(S.gpsWatch);
+  Object.assign(S, { user: null, view: null, gpsWatch: null, duty: false, pickMode: false, simulate: false, trip: null });
+  await Store.logout();
+  $("#appScreen").classList.add("hidden");
+  $("#authScreen").classList.remove("hidden");
+  $("[data-auth=login]").click();
+}
+
+/* ===================== Mapa ===================== */
+let map, meMarker, tripLine, selectedLine;
+const markers = new Map();
+const stopLayers = {};
+
+function initMap() {
+  if (map) return;
+  map = L.map("map", { zoomControl: true }).setView(CONFIG.center, 14);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  map.zoomControl.setPosition("bottomleft");
+
+  ROUTES.forEach((r) => {
+    L.polyline(r.stops.map((s) => s.slice(1)), { color: r.color, weight: 4, opacity: 0.45 }).addTo(map).bindTooltip(r.name, { sticky: true });
+    stopLayers[r.id] = L.layerGroup(r.stops.slice(0, r.terminal + 1).map((s, i) =>
+      L.circleMarker(s.slice(1), { radius: 5, color: r.color, fillColor: "#fff", fillOpacity: 1, weight: 3 })
+        .bindTooltip(`${esc(s[0])} · ${r.id}`)
+        .on("click", () => { if (S.user?.role === "pasajero") { S.routeId = r.id; S.stopIdx = i; show("bus"); } }))).addTo(map);
+  });
+  selectedLine = L.polyline([], { weight: 7, opacity: 0.95 });
+  tripLine = L.polyline([], { color: "#ffb400", weight: 4, dashArray: "8 8" });
+
+  meMarker = L.marker(S.me, { icon: L.divIcon({ className: "me-icon", iconSize: [18, 18] }), zIndexOffset: 1000 }).addTo(map).bindTooltip("Tú");
+
+  map.on("click", (e) => {
+    if (!S.pickMode) return;
+    const p = [e.latlng.lat, e.latlng.lng];
+    if (S.user.role === "pasajero") { S.me = p; S.meSource = "manual"; }
+    else { S.pos = p; S.posSource = "manual"; S.simulate = false; S.s = null; }
+    setPickMode(false);
+    toast("📍 Ubicación actualizada");
+    tick();
+  });
+  $("#locateBtn").addEventListener("click", () => map.flyTo(myPos(), 16));
+  $("#pickBtn").addEventListener("click", () => setPickMode(!S.pickMode));
+  $("#allBtn").addEventListener("click", () => map.fitBounds(L.latLngBounds(ROUTES.flatMap((r) => r.stops.map((s) => s.slice(1)))), { padding: [20, 20] }));
+}
+
+const myPos = () => (S.user?.role === "pasajero" ? S.me : S.pos ?? S.me);
+
+function setPickMode(on) {
+  S.pickMode = on;
+  $("#pickBtn").classList.toggle("active", on);
+  $("#map").classList.toggle("picking", on);
+  banner(on ? "Toca el mapa para poner tu ubicación" : null);
+}
+function banner(msg) { const b = $("#mapBanner"); b.textContent = msg ?? ""; b.classList.toggle("hidden", !msg); }
+
+function driverIcon(d, self) {
+  const r = d.kind === "camion" ? routeById(d.routeId) : null;
+  const html = d.kind === "camion"
+    ? `<div class="veh${self ? " self" : ""}" style="--c:${r?.color ?? "#555"}"><span>🚌</span><b>${esc(d.routeId)}</b></div>`
+    : `<div class="veh taxi${d.busy ? " busy" : ""}${self ? " self" : ""}"><span>🚕</span>${self ? "<b>Tú</b>" : ""}</div>`;
+  return L.divIcon({ className: "veh-wrap", html, iconSize: [40, 28], iconAnchor: [20, 14] });
+}
+
+function driverInfo(d) {
+  const km = Geo.distKm(myPos(), [d.lat, d.lng]);
+  const r = d.kind === "camion" ? routeById(d.routeId) : null;
+  let extra;
+  if (r) {
+    const at = d.s != null ? r.stops[Geo.lastStopIdx(r, d.s)][0] : null;
+    extra = `${esc(r.name)}${at ? `<br>${d.dwell > 0 ? "Detenido en" : "Pasó por"} ${esc(at)}` : ""}`;
+  } else extra = `${d.busy ? "🔴 Ocupado" : "🟢 Libre"}${d.rating ? ` · ⭐ ${d.rating}` : ""} · llega en ${fmtMin(Geo.taxiEtaSec(km))}`;
+  return `<b>${esc(d.name)}</b>${d.demo ? ' <span class="tag">demo</span>' : ""}<br>
+    ${d.kind === "camion" ? "Unidad" : "Placas"} ${esc(d.plate)}<br>${extra}<br>
+    <span class="muted">A ${fmtDist(km)} de ti</span>`;
+}
+
+const visible = (d) => (d.kind === "taxi" ? S.filters.taxi : S.filters.camion && S.filters.routes.has(d.routeId));
+
+function updateMap() {
+  const seen = new Set();
+  for (const d of S.drivers) {
+    const self = S.user && d.id === S.user.id;
+    if (self || !visible(d)) continue;
+    seen.add(d.id);
+    let m = markers.get(d.id);
+    const key = `${d.kind}|${d.routeId}|${d.busy}`;
+    if (!m) {
+      m = L.marker([d.lat, d.lng], { icon: driverIcon(d) }).bindPopup(() => driverInfo(m.driver)).addTo(map);
+      markers.set(d.id, m);
+    } else {
+      m.setLatLng([d.lat, d.lng]);
+      if (m.key !== key) m.setIcon(driverIcon(d));
+      if (m.isPopupOpen()) m.setPopupContent(driverInfo(d));
+    }
+    m.driver = d; m.key = key;
+  }
+  for (const [id, m] of markers) if (!seen.has(id)) { map.removeLayer(m); markers.delete(id); }
+
+  // El propio usuario: punto azul (pasajero) o su vehículo (chofer)
+  if (S.user?.role === "pasajero") { meMarker.setLatLng(S.me); meMarker.setIcon(L.divIcon({ className: "me-icon", iconSize: [18, 18] })); }
+  else if (S.user) {
+    meMarker.setLatLng(S.pos);
+    const key = "self" + S.duty;
+    if (meMarker.key !== key) {
+      meMarker.setIcon(driverIcon({ kind: S.user.role, routeId: S.user.routeId }, true));
+      meMarker.setOpacity(S.duty ? 1 : 0.5); meMarker.key = key;
+    }
+  }
+
+  // Línea del viaje en taxi
+  const t = S.trip;
+  if (t && ["accepted", "arrived", "ontrip", "requested"].includes(t.status)) {
+    const taxiPos = S.user.role === "taxi" ? S.pos : (() => { const d = S.drivers.find((x) => x.id === t.driverId); return d ? [d.lat, d.lng] : null; })();
+    const dest = [t.dest.lat, t.dest.lng];
+    const pts = t.status === "ontrip" ? [taxiPos, dest] : [taxiPos, t.pickup, dest];
+    tripLine.setLatLngs(pts.filter(Boolean)).addTo(map);
+  } else tripLine.remove();
+
+  // Ruta seleccionada resaltada
+  if (S.view === "bus" || (S.view === "service" && S.user.role === "camion")) {
+    const r = routeById(S.view === "bus" ? S.routeId : S.user.routeId);
+    selectedLine.setLatLngs(r.stops.map((s) => s.slice(1))).setStyle({ color: r.color }).addTo(map);
+  } else selectedLine.remove();
+}
+
+/* ===================== GPS ===================== */
+function startPassengerGps() {
+  if (!("geolocation" in navigator)) return;
+  S.gpsWatch = navigator.geolocation.watchPosition((p) => {
+    if (S.meSource === "manual") return;
+    const here = [p.coords.latitude, p.coords.longitude];
+    if (Geo.distKm(here, CONFIG.center) > 40) {
+      if (S.meSource !== "fuera") toast("Estás fuera de la zona de servicio. Usamos una ubicación de ejemplo; puedes cambiarla con ✋.", 6000);
+      S.meSource = "fuera"; return;
+    }
+    S.me = here; S.meSource = "gps";
+  }, () => {}, { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+}
+
+function setDuty(on) {
+  S.duty = on;
+  if (on) {
+    if ("geolocation" in navigator && !S.simulate) {
+      S.posSource = S.posSource === "manual" ? "manual" : "buscando";
+      S.gpsWatch = navigator.geolocation.watchPosition((p) => {
+        if (S.simulate || S.posSource === "manual") return;
+        const here = [p.coords.latitude, p.coords.longitude];
+        if (S.user.role === "camion") {
+          const proj = Geo.projectOnRoute(routeById(S.user.routeId), here, S.s);
+          S.s = proj.d < 0.3 ? proj.s : null; // a más de 300 m de la ruta = fuera de ruta
+        }
+        S.pos = here; S.posSource = "gps";
+      }, () => { if (S.posSource === "buscando") S.posSource = "sin-gps"; }, { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 });
+    }
+    publishLocation();
+  } else {
+    if (S.gpsWatch != null) navigator.geolocation.clearWatch(S.gpsWatch);
+    S.gpsWatch = null;
+    Store.clearLocation(S.user.id);
+  }
+}
+
+function publishLocation() {
+  if (!S.duty || !S.pos) return;
+  if (S.user.role === "camion" && S.s == null && S.posSource !== "gps") {
+    const proj = Geo.projectOnRoute(routeById(S.user.routeId), S.pos, null);
+    S.s = proj.d < 0.3 ? proj.s : null;
+  }
+  Store.setLocation(S.user, { lat: S.pos[0], lng: S.pos[1], s: S.s });
+}
+window.addEventListener("pagehide", () => { if (S.duty) Store.clearLocation(S.user.id); });
+
+// "Simular recorrido": mueve al chofer solo, útil para probar sin salir a la calle
+function simulateDriver(dt) {
+  if (S.user.role === "camion") {
+    const r = routeById(S.user.routeId);
+    if (S.s == null) S.s = Geo.projectOnRoute(r, S.pos, null).s;
+    if (S.dwell > 0) { S.dwell = Math.max(0, S.dwell - dt); return; }
+    const before = Geo.lastStopIdx(r, S.s);
+    S.s += (CONFIG.busSpeedKmh / 3600) * dt * 4; // x4 para que se note
+    if (S.s >= r.length) { S.s = 0; S.dwell = 10; }
+    else if (Geo.lastStopIdx(r, S.s) > before) S.dwell = 10;
+    S.pos = Geo.posOnRoute(r, S.s);
+  } else {
+    const t = S.trip;
+    const target = t?.status === "accepted" ? t.pickup : t?.status === "ontrip" ? [t.dest.lat, t.dest.lng]
+      : t?.status === "arrived" ? null : (S.wander ??= [CONFIG.center[0] + (Math.random() - 0.5) * 0.03, CONFIG.center[1] + (Math.random() - 0.5) * 0.04]);
+    if (!target) return;
+    S.pos = Geo.moveToward(S.pos, target, (CONFIG.taxiSpeedKmh / 3600) * dt * 6);
+    if (target === S.wander && Geo.distKm(S.pos, target) < 0.01) S.wander = null;
+  }
+}
+
+/* ===================== Ciclo en tiempo real ===================== */
+let ticking = false, lastTick = Date.now();
+async function tick() {
+  if (!S.user || ticking) return;
+  ticking = true;
+  try {
+    const now = Date.now(), dt = Math.min(5, (now - lastTick) / 1000); lastTick = now;
+    if (S.user.role === "pasajero") await Sim.tickTrips(dt);
+    else if (S.duty && S.simulate) simulateDriver(dt);
+    publishLocation();
+
+    const busy = await Store.busyDriverIds();
+    S.drivers = [...Sim.drivers(now, busy, Store.activeBotTrips()), ...Store.liveDrivers().map((d) => ({ ...d, busy: busy.has(d.id) }))];
+    S.user = (await Store.getUser(S.user.id)) ?? S.user;
+    const prev = S.trip;
+    S.trip = await Store.currentTrip(S.user);
+    notifyTrip(prev, S.trip);
+
+    $("#walletChip").textContent = money(S.user.balance);
+    updateMap();
+    VIEW_IMPL[S.view]?.update?.();
+  } catch (e) { console.error(e); }
+  finally { ticking = false; }
+}
+setInterval(tick, 1000);
+let quick;
+Store.onChange(() => { clearTimeout(quick); quick = setTimeout(tick, 120); });
+
+function notifyTrip(prev, t) {
+  if (!t) return;
+  const passenger = S.user.role === "pasajero";
+  if (!passenger && t.status === "requested" && prev?.id !== t.id) {
+    toast(`🔔 Nuevo viaje de ${t.passengerName}`, 6000);
+    navigator.vibrate?.([200, 100, 200]);
+    if (S.view !== "service") show("service");
+  }
+  if (passenger && prev?.id === t.id && prev.status !== t.status) {
+    const msg = { accepted: `✅ ${t.driverName} aceptó tu viaje y va por ti`, arrived: "🚕 ¡Tu taxi llegó!" }[t.status];
+    if (msg) { toast(msg); navigator.vibrate?.(200); }
+  }
+  if (["done", "cancelled", "rejected", "expired"].includes(t.status) && !wasShown(t.id)) {
+    markShown(t.id);
+    if (t.status === "done") {
+      const paid = t.payment === "app";
+      modal(passenger
+        ? `<h3>✅ Llegaste a ${esc(t.dest.name)}</h3><p>${paid ? `Se cobraron <b>${money(t.total)}</b> de tu saldo:<br>${money(t.base)} para ${esc(t.driverName)} + ${money(t.fee)} de comisión de la app.` : `No alcanzó tu saldo. Paga <b>${money(t.total)}</b> en efectivo al chofer.`}</p>`
+        : `<h3>✅ Viaje terminado</h3><p>${paid ? `Ganaste <b>${money(t.base)}</b>, ya está en tus ganancias.` : `El pasajero no tenía saldo: cóbrale <b>${money(t.total)}</b> en efectivo.`}</p>`);
+    } else if (t.status === "cancelled" && (passenger ? t.cancelledBy === "driver" : t.cancelledBy === "passenger")) {
+      modal(`<h3>Viaje cancelado</h3><p>${passenger ? "El chofer canceló el viaje. Pide otro taxi." : "El pasajero canceló el viaje."}</p>`);
+    } else if (passenger && (t.status === "rejected" || t.status === "expired")) {
+      modal(`<h3>${t.status === "rejected" ? "El taxi no aceptó" : "Nadie respondió"}</h3><p>Pide otro taxi de la lista.</p>`);
+    }
+  }
+}
+
+/* ===================== Vistas ===================== */
+const VIEWS = {
+  pasajero: [["map", "🗺️", "Mapa"], ["bus", "🚌", "Camiones"], ["taxi", "🚕", "Taxis"], ["wallet", "💳", "Cartera"], ["account", "👤", "Cuenta"]],
+  camion: [["service", "🟢", "Servicio"], ["map", "🗺️", "Mapa"], ["wallet", "💰", "Ganancias"], ["account", "👤", "Cuenta"]],
+  taxi: [["service", "🟢", "Servicio"], ["map", "🗺️", "Mapa"], ["wallet", "💰", "Ganancias"], ["account", "👤", "Cuenta"]],
+};
+
+function show(view) {
+  S.view = view;
+  $$("#tabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.view === view));
+  const panel = $("#panel");
+  panel.innerHTML = ""; panel.scrollTop = 0;
+  VIEW_IMPL[view].mount(panel);
+  VIEW_IMPL[view].update?.();
+  updateMap();
+}
+
+const VIEW_IMPL = {};
+
+/* ---------- Mapa (todos) ---------- */
+VIEW_IMPL.map = {
+  mount(p) {
+    p.innerHTML = `
+      <div class="card">
+        <div id="mvCount" class="strong"></div>
+        <div class="chips" id="mvFilters">
+          <button class="chip" data-f="camion" type="button">🚌 Camiones</button>
+          <button class="chip" data-f="taxi" type="button">🚕 Taxis</button>
+          ${ROUTES.map((r) => `<button class="chip" data-r="${r.id}" type="button"><span class="pill" style="background:${r.color}"></span>${r.id}</button>`).join("")}
+        </div>
+      </div>
+      <h3>Cerca de ti</h3>
+      <ul class="list" id="mvList"></ul>
+      <p class="muted small">Toca un vehículo en el mapa para ver quién maneja, su ruta y a cuánto está. Los marcados como <span class="tag">demo</span> son de ejemplo.</p>`;
+    $("#mvFilters").addEventListener("click", (e) => {
+      const b = e.target.closest(".chip"); if (!b) return;
+      if (b.dataset.f) S.filters[b.dataset.f] = !S.filters[b.dataset.f];
+      else S.filters.routes.has(b.dataset.r) ? S.filters.routes.delete(b.dataset.r) : S.filters.routes.add(b.dataset.r);
+      this.update(); updateMap();
+    });
+    $("#mvList").addEventListener("click", (e) => {
+      const li = e.target.closest("[data-id]"); if (!li) return;
+      const m = markers.get(isNaN(li.dataset.id) ? li.dataset.id : +li.dataset.id);
+      if (m) { map.flyTo(m.getLatLng(), 16); m.openPopup(); }
+    });
+  },
+  update() {
+    const others = S.drivers.filter((d) => d.id !== S.user.id);
+    const buses = others.filter((d) => d.kind === "camion").length, taxis = others.filter((d) => d.kind === "taxi");
+    setHTML($("#mvCount"), `${buses} camiones y ${taxis.length} taxis en servicio · ${taxis.filter((t) => !t.busy).length} taxis libres`);
+    $$("#mvFilters .chip").forEach((c) => c.classList.toggle("on", c.dataset.f ? S.filters[c.dataset.f] : S.filters.routes.has(c.dataset.r)));
+    const near = others.filter(visible).map((d) => ({ d, km: Geo.distKm(myPos(), [d.lat, d.lng]) })).sort((a, b) => a.km - b.km).slice(0, 8);
+    setHTML($("#mvList"), near.length ? near.map(({ d, km }) => {
+      const r = routeById(d.routeId);
+      return `<li data-id="${esc(d.id)}"><span class="ico">${d.kind === "camion" ? "🚌" : "🚕"}</span>
+        <div class="grow"><b>${esc(d.name)}</b>${d.demo ? ' <span class="tag">demo</span>' : ""}
+        <div class="muted small">${d.kind === "camion" ? `<span class="pill" style="background:${r?.color}"></span>${esc(r?.name)}` : `${esc(d.plate)} · ${d.busy ? "ocupado" : "libre"}`}</div></div>
+        <div class="right"><b>${fmtDist(km)}</b>${d.kind === "taxi" ? `<div class="muted small">${fmtMin(Geo.taxiEtaSec(km))}</div>` : ""}</div></li>`;
+    }).join("") : `<li class="muted">No hay vehículos con estos filtros.</li>`);
+  },
+};
+
+/* ---------- Camiones (pasajero) ---------- */
+function nextBus(r, i) {
+  return S.drivers.filter((d) => d.kind === "camion" && d.routeId === r.id && d.s != null)
+    .map((d) => ({ d, ...Geo.busEta(r, d.s, d.dwell, i) })).sort((a, b) => a.sec - b.sec)[0];
+}
+
+VIEW_IMPL.bus = {
+  mount(p) {
+    p.innerHTML = `
+      <label class="field">Ruta<select id="routeSelect">${ROUTES.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("")}</select></label>
+      <div class="route-info" id="routeInfo"></div>
+      <label class="field">Tu parada<select id="stopSelect"></select></label>
+      <div class="card highlight" id="nextBus"></div>
+      <button class="btn primary" id="payBusBtn" type="button">Pagar pasaje · ${money(CONFIG.busFare + Math.round(CONFIG.busFare * CONFIG.commission))}</button>
+      <div id="myTickets"></div>
+      <h3>Tiempo de parada en parada</h3>
+      <ol class="stops" id="stopList"></ol>`;
+    const fillStops = () => {
+      const r = routeById(S.routeId);
+      $("#stopSelect").innerHTML = r.stops.map((s, i) => `<option value="${i}">${esc(s[0])}</option>`).join("");
+      $("#stopSelect").value = S.stopIdx = Math.min(S.stopIdx, r.stops.length - 1);
+    };
+    $("#routeSelect").value = S.routeId;
+    fillStops();
+    const fit = () => map.fitBounds(L.latLngBounds(routeById(S.routeId).stops.map((s) => s.slice(1))), { padding: [30, 30] });
+    fit();
+    $("#routeSelect").addEventListener("change", (e) => { S.routeId = e.target.value; S.stopIdx = 0; fillStops(); fit(); this.update(); updateMap(); });
+    $("#stopSelect").addEventListener("change", (e) => { S.stopIdx = +e.target.value; this.update(); });
+    $("#stopList").addEventListener("click", (e) => { const li = e.target.closest("[data-i]"); if (li) { S.stopIdx = +li.dataset.i; $("#stopSelect").value = S.stopIdx; this.update(); } });
+    $("#payBusBtn").addEventListener("click", () => {
+      const r = routeById(S.routeId), base = CONFIG.busFare, fee = Math.round(base * CONFIG.commission);
+      modal(`<h3>Pagar pasaje</h3><p>${esc(r.name)}</p>
+        <table class="breakdown"><tr><td>Pasaje</td><td>${money(base)}</td></tr>
+        <tr><td>Comisión app (${Math.round(CONFIG.commission * 100)}%)</td><td>${money(fee)}</td></tr>
+        <tr class="total"><td>Total</td><td>${money(base + fee)}</td></tr></table>
+        <p class="muted small">Tu saldo: ${money(S.user.balance)}</p>`, [
+        ["Pagar", "primary", async () => {
+          const t = await Store.buyTicket(S.user.id, r.id);
+          setTimeout(() => modal(`<h3>✅ Pasaje pagado</h3><p>Dile este código al chofer al subir:</p>
+            <div class="code">${t.code}</div><p class="muted small">Válido en ${r.id} hasta las ${new Date(t.expiresAt).toLocaleTimeString("es-MX", { timeStyle: "short" })}. También lo ves en esta pantalla.</p>`), 0);
+        }],
+        ["Cancelar", "ghost"],
+      ]);
+    });
+  },
+  async update() {
+    const r = routeById(S.routeId), i = S.stopIdx, v = CONFIG.busSpeedKmh / 3600;
+    const total = r.length / v + (r.stops.length - 1) * CONFIG.dwellSeconds;
+    setHTML($("#routeInfo"), `<span class="pill" style="background:${r.color}"></span>Va de <b>${esc(r.stops[0][0])}</b> a <b>${esc(r.stops[r.terminal][0])}</b> y regresa · ${r.terminal + 1} paradas · ${fmtDist(r.length)} · vuelta completa ≈ ${fmtMin(total)}`);
+    const nb = nextBus(r, i);
+    setHTML($("#nextBus"), nb ? `
+      <div class="muted">Próximo camión a <b>${esc(r.stops[i][0])}</b></div>
+      <div class="big">${fmtMin(nb.sec)}</div>
+      <div>Chofer <b>${esc(nb.d.name)}</b> · unidad ${esc(nb.d.plate)}${nb.d.demo ? ' <span class="tag">demo</span>' : ""}</div>
+      <div class="muted">Está a <b>${fmtDist(nb.km)}</b> de tu parada · ${nb.d.dwell > 0 ? "detenido en" : "pasó por"} ${esc(r.stops[Geo.lastStopIdx(r, nb.d.s)][0])}</div>
+      <div class="muted small">Tú estás a ${fmtDist(Geo.distKm(S.me, r.stops[i].slice(1)))} de esta parada</div>`
+      : `<div class="muted">No hay camiones de esta ruta en servicio ahora.</div>`);
+    setHTML($("#stopList"), r.stops.map((s, k) => {
+      const seg = k === 0 ? "Inicio de ruta"
+        : `${fmtDist(r.cum[k] - r.cum[k - 1])} · ${fmtMin((r.cum[k] - r.cum[k - 1]) / v + CONFIG.dwellSeconds)} desde la anterior`;
+      const eta = nextBus(r, k);
+      return `<li data-i="${k}" class="${k === i ? "mine" : ""}${k === r.terminal ? " terminal" : ""}" style="color:${r.color}">
+        <span class="dot"></span><span class="txt">${esc(s[0])}<span class="seg">${seg}</span></span>
+        <span class="eta">${eta ? fmtMin(eta.sec) : "—"}</span></li>`;
+    }).join(""));
+    const tickets = await Store.myTickets(S.user.id);
+    setHTML($("#myTickets"), tickets.length ? `<h3>Mis boletos activos</h3>` + tickets.map((t) => `
+      <div class="card ticket"><div class="code small-code">${t.code}</div>
+      <div class="muted small">${esc(routeById(t.routeId).name)} · vence ${new Date(t.expiresAt).toLocaleTimeString("es-MX", { timeStyle: "short" })}</div></div>`).join("") : "");
+  },
+};
+
+/* ---------- Taxis (pasajero) ---------- */
+VIEW_IMPL.taxi = {
+  mount(p) {
+    p.innerHTML = `
+      <div id="tripBox"></div>
+      <div id="taxiSearch">
+        <label class="field">¿A dónde vas?<select id="destSelect">${DESTS.map((d, i) => `<option value="${i}">${esc(d.name)}</option>`).join("")}</select></label>
+        <div class="card" id="taxiQuote"></div>
+        <h3>Taxis libres cerca de ti</h3>
+        <ul class="list" id="taxiList"></ul>
+      </div>`;
+    $("#destSelect").value = S.destIdx;
+    $("#destSelect").addEventListener("change", (e) => { S.destIdx = +e.target.value; this.update(); });
+    $("#taxiList").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-taxi]"); if (!b) return;
+      const d = S.drivers.find((x) => String(x.id) === b.dataset.taxi);
+      if (!d || d.busy) return toast("Ese taxi ya no está disponible.");
+      const dest = DESTS[S.destIdx], q = Store.quote(S.me, dest);
+      modal(`<h3>Pedir taxi</h3><p><b>${esc(d.name)}</b> · ${esc(d.plate)}<br>Destino: ${esc(dest.name)}</p>
+        <table class="breakdown"><tr><td>Viaje (${fmtDist(q.km)})</td><td>${money(q.base)}</td></tr>
+        <tr><td>Comisión app (${Math.round(CONFIG.commission * 100)}%)</td><td>${money(q.fee)}</td></tr>
+        <tr class="total"><td>Total</td><td>${money(q.total)}</td></tr></table>
+        <p class="muted small">Se cobra de tu saldo al terminar el viaje.</p>`, [
+        ["Confirmar", "primary", async () => { await Store.requestTrip(S.user.id, d, S.destIdx, S.me); tick(); }],
+        ["Cancelar", "ghost"],
+      ]);
+    });
+    $("#tripBox").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]"); if (!b) return;
+      run(async () => { await Store.tripAction(S.trip.id, b.dataset.act, S.user.id); tick(); });
+    });
+  },
+  update() {
+    const t = S.trip, active = t && ["requested", "accepted", "arrived", "ontrip"].includes(t.status);
+    $("#taxiSearch").classList.toggle("hidden", !!active);
+    if (active) {
+      const d = S.drivers.find((x) => x.id === t.driverId);
+      const pos = d ? [d.lat, d.lng] : null;
+      const toMe = pos ? Geo.distKm(pos, t.pickup) : null, toDest = pos ? Geo.distKm(pos, [t.dest.lat, t.dest.lng]) : null;
+      const status = {
+        requested: `⏳ Esperando a que <b>${esc(t.driverName)}</b> acepte…`,
+        accepted: `🚕 <b>${esc(t.driverName)}</b> va por ti${pos ? ` · está a <b>${fmtDist(toMe)}</b> · llega en <b>${fmtMin(Geo.taxiEtaSec(toMe))}</b>` : ""}`,
+        arrived: `✅ <b>Tu taxi llegó.</b> Busca las placas <b>${esc(t.plate)}</b>.`,
+        ontrip: `En camino a <b>${esc(t.dest.name)}</b>${pos ? ` · faltan ${fmtDist(toDest)} (${fmtMin(Geo.taxiEtaSec(toDest))})` : ""}`,
+      }[t.status];
+      const btns = {
+        requested: `<button class="btn ghost" data-act="cancel" type="button">Cancelar</button>`,
+        accepted: `<button class="btn ghost" data-act="cancel" type="button">Cancelar</button>`,
+        arrived: `<button class="btn primary" data-act="start" type="button">Ya me subí</button><button class="btn ghost" data-act="cancel" type="button">Cancelar</button>`,
+        ontrip: "",
+      }[t.status];
+      setHTML($("#tripBox"), `<div class="card highlight">
+        <div class="muted">Ruta: tu ubicación → ${esc(t.dest.name)}</div>
+        <p>${status}</p>
+        <div class="muted small">${esc(t.driverName)} · ${esc(t.plate)} · Total ${money(t.total)} (incluye comisión ${money(t.fee)})</div>
+        <div class="row-btns">${btns}</div></div>`);
+      return;
+    }
+    setHTML($("#tripBox"), "");
+    const dest = DESTS[S.destIdx], q = Store.quote(S.me, dest);
+    setHTML($("#taxiQuote"), `<div class="muted">Viaje estimado a <b>${esc(dest.name)}</b></div>
+      <div class="big">${money(q.total)}</div>
+      <div class="muted small">${fmtDist(q.km)} · ≈ ${fmtMin(Geo.taxiEtaSec(q.km / CONFIG.roadFactor))} · banderazo ${money(CONFIG.taxiBase)} + ${money(CONFIG.taxiPerKm)}/km + ${Math.round(CONFIG.commission * 100)}% comisión</div>`);
+    const list = S.drivers.filter((d) => d.kind === "taxi" && !d.busy).map((d) => ({ d, km: Geo.distKm(d.lat ? [d.lat, d.lng] : S.me, S.me) })).sort((a, b) => a.km - b.km);
+    setHTML($("#taxiList"), list.length ? list.map(({ d, km }) => `
+      <li><span class="ico">🚕</span><div class="grow"><b>${esc(d.name)}</b>${d.rating ? ` ⭐ ${d.rating}` : ""}${d.demo ? ' <span class="tag">demo</span>' : ""}
+        <div class="muted small">${esc(d.plate)} · a ${fmtDist(km)} · llega en ${fmtMin(Geo.taxiEtaSec(km))}</div></div>
+        <button class="btn small" data-taxi="${esc(d.id)}" type="button">Pedir</button></li>`).join("")
+      : `<li class="muted">No hay taxis libres ahora.</li>`);
+  },
+};
+
+/* ---------- Cartera / Ganancias ---------- */
+VIEW_IMPL.wallet = {
+  mount(p) {
+    const passenger = S.user.role === "pasajero";
+    p.innerHTML = `
+      <div class="card balance"><div class="muted">${passenger ? "Saldo disponible" : "Tus ganancias"}</div><div class="big" id="balanceBig"></div></div>
+      ${passenger ? `<h3>Recargar saldo</h3>
+        <div class="chips" id="topups">${[5000, 10000, 20000, 50000].map((a) => `<button class="chip" data-amt="${a}" type="button">+${money(a)}</button>`).join("")}</div>
+        <p class="muted small">Pagos de prueba: todavía no se cobra dinero real.</p>`
+        : `<p class="muted small">Recibes el pasaje o la tarifa completa; la comisión de ${Math.round(CONFIG.commission * 100)}% la paga el pasajero. Los retiros a tu cuenta se activan cuando conectemos los pagos reales.</p>`}
+      <h3>Movimientos</h3><ul class="history" id="history"></ul>`;
+    $("#topups")?.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-amt]"); if (!b) return;
+      const amt = +b.dataset.amt;
+      modal(`<h3>Recargar ${money(amt)}</h3><p class="muted">Pago de prueba. Aquí se conectará la pasarela de pago (tarjeta, OXXO, SPEI).</p>`,
+        [["Pagar", "primary", async () => { await Store.topup(S.user.id, amt); toast(`✅ Recargaste ${money(amt)}`); tick(); }], ["Cancelar", "ghost"]]);
+    });
+  },
+  async update() {
+    const w = await Store.wallet(S.user.id);
+    setHTML($("#balanceBig"), money(w.balance));
+    setHTML($("#history"), w.history.length ? w.history.map((h) => `
+      <li><span>${esc(h.description)}<br><span class="muted small">${fmtTime(h.at)}</span></span>
+      <b class="${h.amount < 0 ? "neg" : "pos"}">${h.amount < 0 ? "−" : "+"}${money(Math.abs(h.amount))}</b></li>`).join("")
+      : `<li class="muted">Todavía no hay movimientos.</li>`);
+  },
+};
+
+/* ---------- Cuenta ---------- */
+VIEW_IMPL.account = {
+  mount(p) {
+    const u = S.user, r = routeById(u.routeId);
+    p.innerHTML = `
+      <div class="card">
+        <div class="big">${esc(u.name)}</div>
+        <div class="muted">${ROLE_NAME[u.role]}</div>
+        <dl class="info">
+          <dt>Correo</dt><dd>${esc(u.email)}</dd>
+          <dt>Teléfono</dt><dd>${esc(u.phone)}</dd>
+          ${r ? `<dt>Ruta</dt><dd>${esc(r.name)}</dd>` : ""}
+          ${u.plate ? `<dt>${u.role === "camion" ? "Unidad" : "Placas"}</dt><dd>${esc(u.plate)}</dd>` : ""}
+        </dl>
+      </div>
+      <button class="btn primary" id="logoutBtn" type="button">Cerrar sesión</button>
+      <div class="card tip"><b>💡 Para probar pasajero y chofer a la vez</b>
+        <p class="small">Abre la app en otra pestaña de este mismo navegador y entra con otra cuenta (por ejemplo, una de taxista). Las dos pestañas se ven en el mapa en vivo y pueden hacer un viaje completo.</p></div>`;
+    $("#logoutBtn").addEventListener("click", logout);
+  },
+};
+
+/* ---------- Servicio (choferes) ---------- */
+VIEW_IMPL.service = {
+  mount(p) {
+    const bus = S.user.role === "camion";
+    const r = routeById(S.user.routeId);
+    p.innerHTML = `
+      <button class="duty" id="dutyBtn" type="button"></button>
+      <div class="card">
+        <div class="strong">Tu ubicación</div>
+        <div id="gpsStatus" class="muted small"></div>
+        <label class="check"><input type="checkbox" id="simChk"> Simular recorrido (para probar sin manejar)</label>
+      </div>
+      ${bus ? `
+        <div class="route-info"><span class="pill" style="background:${r.color}"></span><b>${esc(r.name)}</b> · unidad ${esc(S.user.plate)}</div>
+        <div class="card" id="busPos"></div>
+        <h3>Validar boleto</h3>
+        <form id="validateForm" class="inline-form">
+          <input name="code" placeholder="Código del pasajero" maxlength="6" autocapitalize="characters" autocomplete="off" required>
+          <button class="btn small" type="submit">Validar</button>
+        </form>
+        <div id="validateResult"></div>`
+      : `<div id="driverTrip"></div>`}`;
+    $("#dutyBtn").addEventListener("click", () => { setDuty(!S.duty); this.update(); tick(); });
+    $("#simChk").checked = S.simulate;
+    $("#simChk").addEventListener("change", (e) => {
+      S.simulate = e.target.checked;
+      if (S.simulate) { S.posSource = "simulado"; if (!S.duty) setDuty(true); }
+      else S.posSource = S.gpsWatch != null ? "buscando" : null;
+      this.update(); tick();
+    });
+    $("#validateForm")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const input = e.target.code;
+      run(async () => {
+        try {
+          const t = await Store.validateTicket(S.user.id, input.value);
+          $("#validateResult").innerHTML = `<div class="card ok">✅ Boleto válido de <b>${esc(t.passenger)}</b>. Ganaste ${money(t.base)}.</div>`;
+          navigator.vibrate?.(150); input.value = ""; tick();
+        } catch (ex) {
+          if (!(ex instanceof Store.AppError)) throw ex;
+          $("#validateResult").innerHTML = `<div class="card bad">❌ ${esc(ex.message)}</div>`;
+          navigator.vibrate?.([100, 60, 100]);
+        }
+      });
+    });
+    $("#driverTrip")?.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]"); if (!b) return;
+      run(async () => { await Store.tripAction(S.trip.id, b.dataset.act, S.user.id); tick(); });
+    });
+  },
+  update() {
+    const b = $("#dutyBtn");
+    b.className = "duty " + (S.duty ? "on" : "off");
+    setHTML(b, S.duty ? "🟢 En servicio<small>Los pasajeros te ven en el mapa. Toca para salir.</small>" : "⚪ Fuera de servicio<small>Toca para empezar a trabajar</small>");
+    const src = {
+      gps: "📡 Usando el GPS de tu celular.", buscando: "📡 Buscando señal GPS…",
+      "sin-gps": "⚠️ No se pudo usar el GPS. Da permiso de ubicación, o toca ✋ y luego el mapa para ponerla a mano.",
+      manual: "✋ Ubicación puesta a mano. Toca ✋ para cambiarla.", simulado: "🤖 Recorrido simulado.",
+    }[S.posSource] ?? "Activa el servicio para compartir tu ubicación.";
+    setHTML($("#gpsStatus"), src);
+
+    if (S.user.role === "camion") {
+      const r = routeById(S.user.routeId);
+      setHTML($("#busPos"), S.s != null
+        ? `Vas ${S.dwell > 0 ? "detenido en" : "después de"} <b>${esc(r.stops[Geo.lastStopIdx(r, S.s)][0])}</b>; sigue <b>${esc(r.stops[(Geo.lastStopIdx(r, S.s) + 1) % r.stops.length][0])}</b>`
+        : `<span class="muted">${S.duty ? "Estás fuera de tu ruta (a más de 300 m)." : "Activa el servicio para que los pasajeros sepan a cuánto vienes."}</span>`);
+      return;
+    }
+
+    const t = S.trip, box = $("#driverTrip");
+    if (!t || !["requested", "accepted", "arrived", "ontrip"].includes(t.status)) {
+      setHTML(box, `<div class="card muted">${S.duty ? "Esperando viajes… Cuando un pasajero te pida, aparecerá aquí." : "Activa el servicio para recibir viajes."}</div>`);
+      return;
+    }
+    const toPickup = Geo.distKm(S.pos, t.pickup), toDest = Geo.distKm(S.pos, [t.dest.lat, t.dest.lng]);
+    const call = t.passengerPhone ? `<a class="btn ghost" href="tel:${esc(t.passengerPhone)}">📞 Llamar</a>` : "";
+    const body = {
+      requested: `<div class="strong">🔔 Nuevo viaje</div><p><b>${esc(t.passengerName)}</b> está a ${fmtDist(toPickup)}<br>Destino: <b>${esc(t.dest.name)}</b> (${fmtDist(t.km)})<br>Ganas: <b>${money(t.base)}</b></p>
+        <div class="row-btns"><button class="btn primary" data-act="accept" type="button">Aceptar</button><button class="btn ghost" data-act="reject" type="button">Rechazar</button></div>`,
+      accepted: `<div class="strong">Ve por ${esc(t.passengerName)}</div><p>Está a <b>${fmtDist(toPickup)}</b> (${fmtMin(Geo.taxiEtaSec(toPickup))}). Sigue la línea amarilla del mapa.</p>
+        <div class="row-btns"><button class="btn primary" data-act="arrived" type="button">Ya llegué</button>${call}<button class="btn ghost" data-act="cancel" type="button">Cancelar</button></div>`,
+      arrived: `<div class="strong">Esperando a ${esc(t.passengerName)}</div><p>Cuando se suba, inicia el viaje.</p>
+        <div class="row-btns"><button class="btn primary" data-act="start" type="button">Iniciar viaje</button>${call}<button class="btn ghost" data-act="cancel" type="button">Cancelar</button></div>`,
+      ontrip: `<div class="strong">Llevando a ${esc(t.passengerName)}</div><p>Destino: <b>${esc(t.dest.name)}</b> · faltan ${fmtDist(toDest)}</p>
+        <div class="row-btns"><button class="btn primary" data-act="finish" type="button">Terminar y cobrar ${money(t.total)}</button></div>`,
+    }[t.status];
+    setHTML(box, `<div class="card highlight">${body}</div>`);
+  },
+};
+
+/* ===================== Arranque ===================== */
+initAuth();
+Store.currentUser().then((u) => { if (u) enterApp(u); });
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>

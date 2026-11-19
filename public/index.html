@@ -6,73 +6,83 @@
   <meta name="theme-color" content="#1b2a41">
   <title>MueveT · Transporte público</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">🚌 MueveT</div>
-    <div class="wallet-chip" id="walletChip" title="Saldo">$0.00</div>
-  </header>
+  <!-- ============ INICIO DE SESIÓN / CREAR CUENTA ============ -->
+  <div class="screen auth" id="authScreen">
+    <div class="auth-box">
+      <div class="auth-logo">🚌🚕</div>
+      <h1>MueveT</h1>
+      <p class="muted center">Camiones y taxis de tu ciudad, en vivo.</p>
 
-  <div id="map"></div>
-
-  <main class="panel" id="panel">
-    <!-- CAMIONES -->
-    <section class="view active" id="view-bus">
-      <label class="field">Ruta
-        <select id="routeSelect"></select>
-      </label>
-      <div class="route-info" id="routeInfo"></div>
-      <label class="field">Tu parada
-        <select id="stopSelect"></select>
-      </label>
-      <div class="card highlight" id="nextBus"></div>
-      <h3>Tiempo de parada en parada</h3>
-      <ol class="stops" id="stopList"></ol>
-      <button class="btn primary" id="payBusBtn">Pagar pasaje</button>
-    </section>
-
-    <!-- TAXIS -->
-    <section class="view" id="view-taxi">
-      <p class="muted">Taxis de calle registrados cerca de ti. El chofer no necesita app: solo su gafete con QR.</p>
-      <label class="field">¿A dónde vas?
-        <select id="destSelect"></select>
-      </label>
-      <div class="card" id="taxiQuote"></div>
-      <ul class="taxis" id="taxiList"></ul>
-    </section>
-
-    <!-- CARTERA -->
-    <section class="view" id="view-wallet">
-      <div class="card balance">
-        <div class="muted">Saldo disponible</div>
-        <div class="big" id="balanceBig">$0.00</div>
+      <div class="seg" role="tablist">
+        <button class="seg-btn active" data-auth="login" type="button">Iniciar sesión</button>
+        <button class="seg-btn" data-auth="register" type="button">Crear cuenta</button>
       </div>
-      <h3>Recargar</h3>
-      <div class="chips">
-        <button class="chip" data-topup="50">+$50</button>
-        <button class="chip" data-topup="100">+$100</button>
-        <button class="chip" data-topup="200">+$200</button>
-      </div>
-      <h3>Movimientos</h3>
-      <ul class="history" id="history"></ul>
-    </section>
-  </main>
 
-  <nav class="tabs">
-    <button class="tab active" data-view="bus">🚌<span>Camiones</span></button>
-    <button class="tab" data-view="taxi">🚕<span>Taxis</span></button>
-    <button class="tab" data-view="wallet">💳<span>Cartera</span></button>
-  </nav>
+      <form id="loginForm" class="auth-form" novalidate>
+        <label class="field">Correo<input type="email" name="email" autocomplete="email" required></label>
+        <label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
+        <label class="check"><input type="checkbox" name="remember" checked> Mantener sesión iniciada</label>
+        <p class="error" data-error></p>
+        <button class="btn primary" type="submit">Entrar</button>
+      </form>
+
+      <form id="registerForm" class="auth-form hidden" novalidate>
+        <div class="field">¿Cómo vas a usar la app?</div>
+        <div class="roles">
+          <label class="role"><input type="radio" name="role" value="pasajero" checked><span>🧍<b>Pasajero</b></span></label>
+          <label class="role"><input type="radio" name="role" value="camion"><span>🚌<b>Chofer de camión</b></span></label>
+          <label class="role"><input type="radio" name="role" value="taxi"><span>🚕<b>Taxista</b></span></label>
+        </div>
+        <label class="field">Nombre completo<input name="name" autocomplete="name" required></label>
+        <label class="field">Correo<input type="email" name="email" autocomplete="email" required></label>
+        <label class="field">Teléfono<input type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="33 1234 5678" required></label>
+        <label class="field">Contraseña<input type="password" name="password" autocomplete="new-password" minlength="6" placeholder="Mínimo 6 caracteres" required></label>
+        <label class="field driver-only camion-only hidden">Ruta que manejas<select name="routeId"></select></label>
+        <label class="field driver-only hidden"><span data-plate-label>Placas</span><input name="plate" autocapitalize="characters"></label>
+        <p class="error" data-error></p>
+        <button class="btn primary" type="submit">Crear cuenta</button>
+      </form>
+      <p class="muted small center">Por ahora tus datos se guardan solo en este dispositivo.</p>
+    </div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div class="screen app hidden" id="appScreen">
+    <header class="topbar">
+      <div class="brand">🚌 MueveT</div>
+      <button class="wallet-chip" id="walletChip" type="button">$0.00</button>
+    </header>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-tools">
+        <button class="map-btn" id="locateBtn" type="button" title="Centrar en mí">📍</button>
+        <button class="map-btn" id="pickBtn" type="button" title="Elegir mi ubicación en el mapa">✋</button>
+        <button class="map-btn" id="allBtn" type="button" title="Ver toda la ciudad">🗺️</button>
+      </div>
+      <div class="map-banner hidden" id="mapBanner"></div>
+    </div>
+
+    <main class="panel" id="panel"></main>
+    <nav class="tabs" id="tabs"></nav>
+  </div>
 
   <dialog id="modal">
     <div id="modalBody"></div>
     <div class="modal-actions" id="modalActions"></div>
   </dialog>
+  <div class="toast hidden" id="toast"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/geo.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/sim.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
