@@ -1,0 +1,12 @@
+{
+  "name": "muevet",
+  "version": "1.0.0",
+  "description": "App de transporte público: camiones y taxis de calle en tiempo real, con cuentas y pagos",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/server.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/"
+  }
+}
